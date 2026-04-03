@@ -42,7 +42,8 @@ class SiteConfig:
 
         self.tips = "".join(raw.get("tips", []))
 
-    def __str__(self):
+    def say_hello(self):
+        print("="*30)
         print(f"ℹ️ Site Configs:")
         print(f"ℹ️ \turl = '{self.url}'")
         print(f"ℹ️ \thandler = '{self.handler.__name__}'")
@@ -52,8 +53,8 @@ class SiteConfig:
         print(f"ℹ️ \twindow_size = '{self.window_size}'")
         print(f"ℹ️ \textra_styles = '{self.extra_styles}'")
         print(f"ℹ️ \tcookies = '{self.cookies}'")
-
-        print(f"ℹ️ \ttips: {self.tips}")
+        print(f"ℹ️ \ttips: '{self.tips}'")
+        print("="*30 + "\n\n")
 
     def build_cookies(self, cookies_file_path: str, add_cookies: Callable) -> None:
         if self.cookies is not None:
@@ -76,7 +77,7 @@ class SiteConfig:
     def find_match(target_url, configs: list["SiteConfig"]) -> "SiteConfig":
         for config in configs:
             if target_url.startswith(config.url):
-                pprint(config.__str__())
+                config.say_hello()
                 return config
         print("💥 Not supported...")
         raise ValueError
@@ -106,10 +107,18 @@ class DL:
 
     @staticmethod
     def hint_page_number(page):
-        if DL.CFG.patterns["page-number"]:
-            page_number = page.locator(
-                DL.CFG.patterns["page-number"]).first
-            print(f"ℹ️ Page Number = {page_number.inner_text()}")
+        now_page = "?"
+        now_page_pat = DL.CFG.patterns["page-number"]["now"]
+        all_page = "?"
+        all_page_pat = DL.CFG.patterns["page-number"]["all"]
+
+        if now_page_pat:
+            now_page = page.locator(now_page_pat).first.inner_text()
+
+        if all_page_pat:
+            all_page = page.locator(all_page_pat).first.inner_text()
+
+        print(f"ℹ️ Page Number = {now_page} / {all_page}")
 
     @staticmethod
     def select_image_by_rule(page, output_dir):
@@ -261,6 +270,7 @@ def run(browser: Browser, dirname: str, ep_url: str, cookies_file_path: str):
 
         DL.PAGE = DL.CFG.initial_pagenum
         print(f"ℹ️ Starting from page {DL.CFG.initial_pagenum}")
+        print(f"⚠️ Tips {DL.CFG.tips}")
 
         print("ℹ️ Press 'd' key after current page being loaded")
         print("="*30 + "\n")
@@ -272,13 +282,15 @@ def run(browser: Browser, dirname: str, ep_url: str, cookies_file_path: str):
     except Exception as e:
         print(f"⚠️ Stop reason: {e}")
 
+
 CONFIGS: list[SiteConfig] = [
 ]
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
+    argc = len(sys.argv)
+    if argc > 1:
         ep_url = sys.argv[1]
-        cookies_file_path = sys.argv[2] if len(sys.argv) > 2 else "cookies.json"
+        cookies_file_path = sys.argv[2] if argc > 2 else "cookies.json"
 
         DL.CFG = SiteConfig.find_match(ep_url, CONFIGS)
 
