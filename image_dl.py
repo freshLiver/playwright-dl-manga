@@ -10,6 +10,7 @@ from typing import Callable, Dict, Any, Tuple
 
 from playwright.sync_api import sync_playwright, Browser
 
+
 class SiteConfig:
     url: str
     handler: Callable
@@ -20,6 +21,7 @@ class SiteConfig:
     extra_styles: str
     timing: Dict[str, int]
     cookies: Dict[str, str]
+    tips: str
 
     def __init__(self, raw: Dict[str, Any]) -> "SiteConfig":
         assert ("url" in raw)
@@ -38,6 +40,8 @@ class SiteConfig:
         )
         self.cookies = raw.get("cookies", None)
 
+        self.tips = "".join(raw.get("tips", []))
+
     def __str__(self):
         print(f"ℹ️ Site Configs:")
         print(f"ℹ️ \turl = '{self.url}'")
@@ -48,6 +52,8 @@ class SiteConfig:
         print(f"ℹ️ \twindow_size = '{self.window_size}'")
         print(f"ℹ️ \textra_styles = '{self.extra_styles}'")
         print(f"ℹ️ \tcookies = '{self.cookies}'")
+
+        print(f"ℹ️ \ttips: {self.tips}")
 
     def build_cookies(self, cookies_file_path: str, add_cookies: Callable) -> None:
         if self.cookies is not None:
@@ -147,7 +153,7 @@ class DL:
         try:
             # 1. Try to find the target page container (usually all preloaded)
             target_area = page.locator(
-                DL.CFG.patterns["area"]).nth(display_index - 1) # 0-based
+                DL.CFG.patterns["area"]).nth(display_index - 1)  # 0-based
             if target_area.count() == 0:
                 print(
                     f"⚠️ Cannot {display_index}-th area (probably last page)")
