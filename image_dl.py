@@ -40,7 +40,7 @@ class SiteConfig:
         )
         self.cookies = raw.get("cookies", None)
 
-        self.tips = "".join(raw.get("tips", []))
+        self.tips = "\n".join(raw.get("tips", []))
 
     def say_hello(self):
         print("="*30)
@@ -270,7 +270,7 @@ def run(browser: Browser, dirname: str, ep_url: str, cookies_file_path: str):
 
         DL.PAGE = DL.CFG.initial_pagenum
         print(f"ℹ️ Starting from page {DL.CFG.initial_pagenum}")
-        print(f"⚠️ Tips {DL.CFG.tips}")
+        print(f"⚠️ Tips: \n{DL.CFG.tips}")
 
         print("ℹ️ Press 'd' key after current page being loaded")
         print("="*30 + "\n")
