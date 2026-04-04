@@ -8,7 +8,7 @@ import json
 from pprint import pprint
 from typing import Callable, Dict, Any, Tuple
 
-from playwright.sync_api import sync_playwright, Browser
+from playwright.sync_api import sync_playwright, Browser, Locator
 
 
 class SiteConfig:
@@ -19,7 +19,6 @@ class SiteConfig:
     initial_pagenum: int
     window_size: Tuple[int, int]
     extra_styles: str
-    timing: Dict[str, int]
     cookies: Dict[str, str]
     tips: str
 
@@ -35,9 +34,6 @@ class SiteConfig:
         self.initial_pagenum = raw.get("initial-pagenum", 1)
         self.window_size = raw.get("window-size", (2000, 3500))
         self.extra_styles = "".join(raw.get("extra-styles", []))
-        self.timing = raw.get(
-            "timing", {"ep-load-time-ms": 5000, "page-load-time-ms": 3000}
-        )
         self.cookies = raw.get("cookies", None)
 
         self.tips = "\n".join(raw.get("tips", []))
@@ -74,6 +70,32 @@ class SiteConfig:
             add_cookies(cookies)
 
     @staticmethod
+    def get_text(loc: Locator) -> str:
+        return loc.inner_text()
+
+    @staticmethod
+    def get_text_with_regex(loc: Locator, rule: re) -> str:
+        return re.match(rule, loc.inner_text()).group()
+
+    @staticmethod
+    def get_text_by_evaluate(loc: Locator, code: str) -> str:
+        return loc.evaluate(code)
+
+    @staticmethod
+    def resolve_pattern(loc: Locator, pattern: Dict | str):
+        if type(pattern) is str:
+            rule = pattern
+            filter = SiteConfig.get_text
+            filter_args = {}
+        else:
+            assert "rule" in pattern, f"illegal pattern struct: '{pattern}'"
+            rule = pattern["rule"]
+            filter = pattern.get("filter", SiteConfig.get_text)
+            filter_args = pattern.get("filter-args", {})
+
+        return filter(loc(rule).first, **filter_args)
+
+    @staticmethod
     def find_match(target_url, configs: list["SiteConfig"]) -> "SiteConfig":
         for config in configs:
             if target_url.startswith(config.url):
@@ -106,25 +128,22 @@ class DL:
         return f"{output_dir}/page_{page_index:03d}.png"
 
     @staticmethod
-    def hint_page_number(page):
-        now_page = "?"
-        now_page_pat = DL.CFG.patterns["page-number"]["now"]
-        all_page = "?"
-        all_page_pat = DL.CFG.patterns["page-number"]["all"]
+    def hint_page_info(loc: Locator):
+        pat = DL.CFG.patterns["page-number"]
 
-        if now_page_pat:
-            now_page = page.locator(now_page_pat).first.inner_text()
+        page_info = []
+        for info in ["now", "all", "progress"]:
+            if info in pat:
+                text = DL.CFG.resolve_pattern(loc, pat[info])
+                page_info.append(f"{info}={text}")
 
-        if all_page_pat:
-            all_page = page.locator(all_page_pat).first.inner_text()
-
-        print(f"ℹ️ Page Number = {now_page} / {all_page}")
+        print(f"ℹ️ Page Info: {' '.join(page_info)}")
 
     @staticmethod
     def select_image_by_rule(page, output_dir):
         display_index = DL.PAGE
-        print(f"\nProcessing page {display_index}...")
-        DL.hint_page_number(page)
+        print(f"\nProcessing page {display_index} ...")
+        DL.hint_page_info(page.locator)
 
         try:
             # 1. Find the first matching container
@@ -157,7 +176,7 @@ class DL:
         # 1-based page index
         display_index = DL.PAGE
         print(f"\nProcessing page {display_index}...")
-        DL.hint_page_number(page)
+        DL.hint_page_info(page.locator)
 
         try:
             # 1. Try to find the target page container (usually all preloaded)
@@ -208,17 +227,16 @@ class DL:
 
     @staticmethod
     def build_dir(page) -> str:
-        name_patterns = DL.CFG.patterns["name"]
+        pat = DL.CFG.patterns["name"]
 
         fullname = ""
-        for pat in ["author", "title", "episode"]:
-            if name_patterns[pat] is None:
+        for info in ["author", "title", "episode"]:
+            if pat[info] is None:
                 continue
-            loc = page.locator(name_patterns[pat]).first
-            loc.wait_for(timeout=DL.CFG.timing["ep-load-time-ms"])
 
-            print(f"ℹ️ {name_patterns}[{pat}] => {loc.inner_text()}")
-            fullname += loc.inner_text() + (" - " if pat == "author" else " ")
+            text = DL.CFG.resolve_pattern(page.locator, pat[info])
+            print(f"ℹ️ [{info}] = {pat[info]} => {text}")
+            fullname += text + (" - " if info == "author" else " ")
 
         return re.sub(r'[<>:"/\\|?*]', '_', fullname).strip()
 
