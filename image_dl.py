@@ -16,6 +16,7 @@ class SiteConfig:
     handler: Callable
     patterns: Dict[str, Any]
 
+    keymaps: Dict[str, Dict]
     initial_pagenum: int
     window_size: Tuple[int, int]
     extra_styles: str
@@ -31,6 +32,13 @@ class SiteConfig:
         self.handler = raw["handler"]
         self.patterns = raw["patterns"]
 
+        self.keymaps = raw.get("keymaps", {})
+        if "d" not in self.keymaps:
+            self.keymaps["d"] = {
+                "event": "keydown",
+                "codes": ["await window.py_screenshot();"]
+            }
+
         self.initial_pagenum = raw.get("initial-pagenum", 1)
         self.window_size = raw.get("window-size", (2000, 3500))
         self.extra_styles = "".join(raw.get("extra-styles", []))
@@ -45,6 +53,8 @@ class SiteConfig:
         print(f"ℹ️ \thandler = '{self.handler.__name__}'")
         print(f"ℹ️ \tpatterns = \n")
         pprint(self.patterns)
+        print(f"ℹ️ \tkeymaps = \n")
+        pprint(self.keymaps)
         print(f"ℹ️ \tinitial_pagenum = {self.initial_pagenum}")
         print(f"ℹ️ \twindow_size = '{self.window_size}'")
         print(f"ℹ️ \textra_styles = '{self.extra_styles}'")
@@ -106,20 +116,7 @@ class SiteConfig:
 
 
 class DL:
-
-    SCREENSHOT_LISTENER = f"""
-        document.addEventListener('keydown', async (e) => {{
-            if (e.key === 'd' || e.key === 'D') {{
-                try {{
-                    await window.py_screenshot();
-                }} catch (err) {{
-                    console.error(err);
-                }}
-            }}
-        }});
-    """
-
-    TASK_QUEUE = queue.Queue()
+    TASKS = queue.Queue()
     PAGE = 0
     CFG = SiteConfig
 
@@ -211,18 +208,55 @@ class DL:
                 pass
 
     @staticmethod
+    def inject_keymaps(page):
+        for key, config in DL.CFG.keymaps.items():
+            event = config["event"]
+            codes = "\n".join(config["codes"])
+
+            script = f"""
+                () => {{
+                    document.addEventListener('{event}', async (e) => {{
+                        if (e.key === '{key}') {{
+                            try {{
+                                {codes}
+                            }} catch (err) {{
+                                console.error(err);
+                            }}
+                        }}
+                    }});
+                }}
+            """
+
+            print(f"ℹ️ Injecting keymap event:\n{script}")
+            page.evaluate(script)
+
+    @staticmethod
+    def inject_styles(page):
+        script = f"""
+            () => {{
+                const style = document.createElement("style");
+                style.textContent = `
+                    {DL.CFG.extra_styles}
+                `;
+                document.head.appendChild(style);
+            }}
+        """
+        print(f"ℹ️ Injecting extra style:\n{script}")
+        page.evaluate(script)
+
+    @staticmethod
     def do_task(page, start_time):
         try:
             {
                 "screenshot": DL.CFG.handler
-            }[DL.TASK_QUEUE.get_nowait()](page, start_time)
+            }[DL.TASKS.get_nowait()](page, start_time)
         except queue.Empty:
             pass
 
     @staticmethod
     def task_screenshot():
         print("✅ Request 'screenshot' received")
-        DL.TASK_QUEUE.put("screenshot")
+        DL.TASKS.put("screenshot")
         return "✅ Request received"
 
     @staticmethod
@@ -266,18 +300,9 @@ def run(browser: Browser, dirname: str, ep_url: str, cookies_file_path: str):
     except Exception as e:
         print(f"⚠️ Create output dir error: {e}")
 
-    # --- Inject JS to website ---
-    page.evaluate(f"""
-        () => {{
-            {DL.SCREENSHOT_LISTENER}
-
-            const style = document.createElement("style");
-            style.textContent = `
-                {DL.CFG.extra_styles}
-            `;
-            document.head.appendChild(style);
-        }}
-    """)
+    # --- Inject codes / styles to website ---
+    DL.inject_styles(page)
+    DL.inject_keymaps(page)
 
     try:
         if not os.path.exists(dirname):
