@@ -84,8 +84,15 @@ class SiteConfig:
         return loc.inner_text()
 
     @staticmethod
-    def get_text_with_regex(loc: Locator, rule: re) -> str:
-        return re.match(rule, loc.inner_text()).group()
+    def get_text_after_replaces(loc: Locator, rules: list[Tuple[str, str]]) -> str:
+        text: str = loc.inner_text()
+        for (a, b) in rules:
+            text = text.replace(a, b)
+        return text
+
+    @staticmethod
+    def get_text_with_regex(loc: Locator, rule, group: int = 0) -> str:
+        return re.search(rule, loc.inner_text()).group(group)
 
     @staticmethod
     def get_text_by_evaluate(loc: Locator, code: str) -> str:
@@ -299,6 +306,7 @@ def run(browser: Browser, dirname: str, ep_url: str, cookies_file_path: str):
             print("⚠️ Create output dir from default name")
     except Exception as e:
         print(f"⚠️ Create output dir error: {e}")
+        return
 
     # --- Inject codes / styles to website ---
     DL.inject_styles(page)
