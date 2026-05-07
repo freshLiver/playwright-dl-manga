@@ -99,6 +99,13 @@ class SiteConfig:
         return loc.evaluate(code)
 
     @staticmethod
+    def build_selector_rule(_: Locator, rule: str, replaces: list[Tuple[str, str | Callable]]):
+        for (src, dst) in replaces:
+            target = dst if type(dst) is str else str(dst())
+            rule = rule.replace(src, target)
+        return rule
+
+    @staticmethod
     def resolve_pattern(loc: Locator, pattern: Dict | str):
         if type(pattern) is str:
             rule = pattern
@@ -144,14 +151,16 @@ class DL:
         print(f"ℹ️ Page Info: {' '.join(page_info)}")
 
     @staticmethod
-    def select_image_by_rule(page, output_dir):
+    def select_image_by_rule(pg, output_dir):
         display_index = DL.PAGE
         print(f"\nProcessing page {display_index} ...")
-        DL.hint_page_info(page.locator)
+        DL.hint_page_info(pg.locator)
 
         try:
             # 1. Find the first matching container
-            container = page.locator(DL.CFG.patterns["rule"]).first
+            rule = DL.CFG.resolve_pattern(pg.locator, DL.CFG.patterns["rule"])
+            print(rule)
+            container = pg.locator(rule).first
             if container.count() == 0:
                 print(f"⚠️ Cannot find container for page {display_index}")
                 return
@@ -171,7 +180,7 @@ class DL:
         except Exception as e:
             print(f"💥 {str(e)}")
             try:
-                page.evaluate(f"alert('{str(e)}')")
+                pg.evaluate(f"alert('{str(e)}')")
             except:
                 pass
 
