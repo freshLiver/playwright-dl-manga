@@ -267,7 +267,7 @@ class DL:
         return "✅ Request received"
 
     @staticmethod
-    def build_dir(page) -> str:
+    def build_dir(page, base="tmp/") -> str:
         pat = DL.CFG.patterns["name"]
 
         fullname = ""
@@ -279,7 +279,7 @@ class DL:
             print(f"ℹ️ [{info}] = {pat[info]} => {text}")
             fullname += text + (" - " if info == "author" else " ")
 
-        return re.sub(r'[<>:"/\\|?*]', '_', fullname).strip()
+        return base + re.sub(r'[<>:"/\\|?*]', '_', fullname).strip()
 
 
 def run(browser: Browser, dirname: str, ep_url: str, cookies_file_path: str):
