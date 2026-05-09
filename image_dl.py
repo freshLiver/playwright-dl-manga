@@ -270,10 +270,11 @@ class DL:
             pass
 
     @staticmethod
-    def task_screenshot():
-        print("✅ Request 'screenshot' received")
-        DL.TASKS.put("screenshot")
-        return "✅ Request received"
+    def task_screenshot(n: int = 1):
+        for i in range(1, n+1):
+            print(f"✅ Request 'screenshot[{i}]' received")
+            DL.TASKS.put("screenshot")
+        return f"✅ {n} requests received"
 
     @staticmethod
     def build_dir(page, base="tmp/") -> str:
